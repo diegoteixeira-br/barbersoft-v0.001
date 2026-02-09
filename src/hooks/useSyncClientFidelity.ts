@@ -108,9 +108,9 @@ export function useSyncClientFidelity() {
   // Sync ALL clients using the database function
   const syncAll = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.rpc("recalculate_all_client_fidelity");
+      const { data, error } = await supabase.rpc("recalculate_all_client_fidelity" as any);
       if (error) throw error;
-      return data as { processed_clients: number; updated_clients: number }[];
+      return data as unknown as { processed_clients: number; updated_clients: number }[];
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });

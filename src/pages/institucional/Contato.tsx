@@ -12,59 +12,50 @@ import { supabase } from '@/integrations/supabase/client';
 
 const RECAPTCHA_SITE_KEY = '6Le2q2EsAAAAALT1XXCEYyPsT3gfauLb_0JgYXs7';
 
-// Extend window for grecaptcha enterprise
-declare global {
-  interface Window {
-    grecaptcha: {
-      enterprise: {
-        ready: (callback: () => void) => void;
-        execute: (siteKey: string, options: { action: string }) => Promise<string>;
-      };
-    };
-  }
-}
+// Window type is extended in useRecaptcha.ts
 
 const Contato = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRecaptchaReady, setIsRecaptchaReady] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Load reCAPTCHA Enterprise script
+  // Load standard reCAPTCHA v3 script
   useEffect(() => {
-    const scriptId = 'recaptcha-enterprise-script';
-    
-    // Check if script already exists
-    if (document.getElementById(scriptId)) {
-      if (window.grecaptcha?.enterprise) {
-        window.grecaptcha.enterprise.ready(() => setIsRecaptchaReady(true));
-      }
+    if (window.grecaptcha?.ready) {
+      window.grecaptcha.ready(() => setIsRecaptchaReady(true));
       return;
     }
 
+    const existingScript = document.querySelector(`script[src*="recaptcha/api.js"]`);
+    if (existingScript) {
+      const checkReady = setInterval(() => {
+        if (window.grecaptcha?.ready) {
+          window.grecaptcha.ready(() => {
+            setIsRecaptchaReady(true);
+            clearInterval(checkReady);
+          });
+        }
+      }, 100);
+      return () => clearInterval(checkReady);
+    }
+
     const script = document.createElement('script');
-    script.id = scriptId;
-    script.src = `https://www.google.com/recaptcha/enterprise.js?render=${RECAPTCHA_SITE_KEY}`;
+    script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
     script.async = true;
     script.defer = true;
     
     script.onload = () => {
-      window.grecaptcha.enterprise.ready(() => {
-        console.log('reCAPTCHA Enterprise ready');
+      window.grecaptcha.ready(() => {
         setIsRecaptchaReady(true);
       });
     };
 
     script.onerror = () => {
       console.error('Failed to load reCAPTCHA script');
-      // Still allow form submission without reCAPTCHA if it fails to load
       setIsRecaptchaReady(true);
     };
 
     document.head.appendChild(script);
-
-    return () => {
-      // Cleanup script on unmount (optional)
-    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,12 +83,11 @@ const Contato = () => {
       // Get reCAPTCHA token
       let recaptchaToken = '';
       
-      if (window.grecaptcha?.enterprise) {
+      if (window.grecaptcha) {
         try {
-          recaptchaToken = await window.grecaptcha.enterprise.execute(RECAPTCHA_SITE_KEY, {
+          recaptchaToken = await window.grecaptcha.execute(RECAPTCHA_SITE_KEY, {
             action: 'contact_form'
           });
-          console.log('reCAPTCHA token generated');
         } catch (recaptchaError) {
           console.error('reCAPTCHA error:', recaptchaError);
           toast.error('Erro na verificação de segurança. Tente novamente.');
@@ -105,7 +95,6 @@ const Contato = () => {
           return;
         }
       } else {
-        console.warn('reCAPTCHA not available');
         toast.error('Verificação de segurança não disponível. Recarregue a página.');
         setIsSubmitting(false);
         return;
