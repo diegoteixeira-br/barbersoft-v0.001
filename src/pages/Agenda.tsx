@@ -39,6 +39,10 @@ export default function Agenda() {
     const saved = localStorage.getItem("agenda-compact-mode");
     return saved === "true";
   });
+  const [showBusinessHoursOnly, setShowBusinessHoursOnly] = useState(() => {
+    const saved = localStorage.getItem("agenda-business-hours-only");
+    return saved === "true";
+  });
   
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
