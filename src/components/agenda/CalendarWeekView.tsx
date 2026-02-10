@@ -96,8 +96,8 @@ export function CalendarWeekView({
   const fallbackClosingHour = closingTime ? parseInt(closingTime.split(":")[0], 10) : 21;
 
   const { minHour, maxHour } = useMemo(() => {
-    let min = fallbackOpeningHour;
-    let max = fallbackClosingHour;
+    let min = 23;
+    let max = 0;
     
     if (getOpeningHours) {
       days.forEach(day => {
@@ -109,6 +109,12 @@ export function CalendarWeekView({
           max = Math.max(max, dayClose);
         }
       });
+    }
+    
+    // If no business hours found, use fallbacks
+    if (min > max) {
+      min = fallbackOpeningHour;
+      max = fallbackClosingHour;
     }
     
     return { minHour: min, maxHour: max };
