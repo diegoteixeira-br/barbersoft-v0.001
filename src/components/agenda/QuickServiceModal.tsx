@@ -83,6 +83,12 @@ export function QuickServiceModal({
   onSubmit,
   isLoading,
 }: QuickServiceModalProps) {
+  const [isSplit, setIsSplit] = useState(false);
+  const [splitMethod1, setSplitMethod1] = useState("cash");
+  const [splitMethod2, setSplitMethod2] = useState("pix");
+  const [splitAmount1, setSplitAmount1] = useState(0);
+  const [splitAmount2, setSplitAmount2] = useState(0);
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
