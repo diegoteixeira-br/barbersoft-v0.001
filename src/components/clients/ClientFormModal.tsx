@@ -72,7 +72,8 @@ export function ClientFormModal({
       }
       setNewTag("");
     }
-  }, [client, open, initialName, defaultUnitId, units]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, open, initialName, defaultUnitId, units.length]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(formatPhone(e.target.value));
