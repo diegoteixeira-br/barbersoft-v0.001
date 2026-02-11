@@ -37,6 +37,7 @@ interface DemoTourModalProps {
 
 // Narration texts for each slide
 const narrationTexts = [
+  "Bem-vindo ao BarberSoft! Vou te mostrar como o sistema funciona na prática. Navegue pelos slides para conhecer cada funcionalidade. Vamos lá!",
   "Painel de Controle Inteligente. Acompanhe faturamento, agendamentos, clientes e ticket médio em tempo real. Veja o desempenho semanal da sua barbearia e os próximos horários agendados, tudo em uma tela.",
   "Agenda Completa. Gerencie seus agendamentos por dia, semana ou mês. Filtre por profissional, veja os detalhes de cada atendimento e organize a rotina da sua equipe com um calendário visual e intuitivo.",
   "Controle Financeiro Total. Tenha controle completo do caixa da sua barbearia. Acompanhe receita, despesas e lucro em tempo real. Veja as comissões de cada profissional calculadas automaticamente.",
@@ -45,6 +46,23 @@ const narrationTexts = [
   "Marketing Inteligente. Envie campanhas em massa pelo WhatsApp, acompanhe taxas de abertura e conversões. Automatize lembretes de aniversário e recupere clientes que não voltaram há muito tempo.",
   "Gestão Multi-Unidades. Gerencie todas as suas filiais de forma centralizada. Acompanhe o faturamento, agendamentos e desempenho de cada unidade em um só painel.",
 ];
+
+// Intro/Welcome Slide
+const IntroSlide = () => (
+  <div className="bg-background/95 rounded-xl border border-border/50 p-4 md:p-6 h-full flex flex-col items-center justify-center text-center">
+    <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mb-6 animate-scale-in">
+      <Volume2 className="w-8 h-8 text-primary" />
+    </div>
+    <h2 className="text-2xl font-bold text-foreground mb-3 animate-fade-in">Bem-vindo ao BarberSoft!</h2>
+    <p className="text-muted-foreground max-w-md mb-6 animate-fade-in" style={{ animationDelay: "200ms" }}>
+      Vou te mostrar como o sistema funciona na prática. Ative o som para ouvir a narração enquanto navega pelos slides.
+    </p>
+    <div className="flex items-center gap-2 text-sm text-primary animate-fade-in" style={{ animationDelay: "400ms" }}>
+      <ChevronRight className="w-4 h-4 animate-pulse" />
+      <span>Clique na seta para começar</span>
+    </div>
+  </div>
+);
 
 // Dashboard Preview Slide
 const DashboardSlide = () => (
@@ -401,6 +419,13 @@ const UnidadesSlide = () => (
 );
 
 const slides = [
+  {
+    id: 0,
+    title: "Bem-vindo ao BarberSoft",
+    description: "Conheça o sistema completo para sua barbearia",
+    icon: Volume2,
+    component: IntroSlide,
+  },
   {
     id: 1,
     title: "Painel de Controle Inteligente",
