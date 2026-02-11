@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { slideIndex, text } = await req.json();
+    const { slideIndex, text, forceRegenerate } = await req.json();
 
     if (slideIndex === undefined || slideIndex === null) {
       throw new Error("slideIndex is required");
@@ -24,12 +24,18 @@ serve(async (req) => {
 
     const fileName = `slide-${slideIndex}.mp3`;
 
+    // If forceRegenerate, delete existing file first
+    if (forceRegenerate) {
+      console.log(`Force regenerating slide ${slideIndex}, deleting existing file...`);
+      await supabase.storage.from("demo-audio").remove([fileName]);
+    }
+
     // Check if audio already exists in storage
     const { data: existingFile } = await supabase.storage
       .from("demo-audio")
       .list("", { search: fileName });
 
-    const fileExists = existingFile && existingFile.some((f) => f.name === fileName);
+    const fileExists = !forceRegenerate && existingFile && existingFile.some((f) => f.name === fileName);
 
     if (fileExists) {
       const { data: urlData } = supabase.storage
