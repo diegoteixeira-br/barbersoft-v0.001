@@ -6,7 +6,6 @@ export interface Company {
   id: string;
   name: string;
   evolution_instance_name: string | null;
-  evolution_api_key: string | null;
   owner_user_id: string;
   referral_code: string | null;
   created_at: string;
@@ -16,7 +15,6 @@ export interface Company {
 interface CompanyFormData {
   name?: string;
   evolution_instance_name?: string | null;
-  evolution_api_key?: string | null;
 }
 
 export function useCompany() {
@@ -32,7 +30,7 @@ export function useCompany() {
       // Use order + limit to handle multiple companies gracefully (picks oldest)
       const { data, error } = await supabase
         .from("companies")
-        .select("*")
+        .select("id, name, evolution_instance_name, owner_user_id, referral_code, plan_status, plan_type, trial_ends_at, is_partner, partner_ends_at, is_blocked, stripe_customer_id, stripe_subscription_id, signup_source, created_at, updated_at")
         .eq("owner_user_id", user.id)
         .order("created_at", { ascending: true })
         .limit(1)

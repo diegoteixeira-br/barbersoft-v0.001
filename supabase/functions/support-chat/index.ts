@@ -125,6 +125,26 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
+
+    // Validate messages input
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Mensagens inválidas." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (messages.length > 50) {
+      return new Response(
+        JSON.stringify({ error: "Limite de mensagens excedido." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    // Validate individual messages and truncate overly long ones
+    const validatedMessages = messages.map((m: any) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: typeof m.content === "string" ? m.content.slice(0, 4000) : "",
+    }));
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
@@ -132,7 +152,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Sending request to Lovable AI with", messages.length, "messages");
+    console.log("Sending request to Lovable AI with", validatedMessages.length, "messages");
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -144,7 +164,7 @@ serve(async (req) => {
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          ...messages,
+          ...validatedMessages,
         ],
         stream: true,
       }),
