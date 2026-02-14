@@ -5,10 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Building2, Loader2 } from "lucide-react";
 import { useBusinessSettings, BusinessSettingsInput } from "@/hooks/useBusinessSettings";
+import { useCompany } from "@/hooks/useCompany";
 import { AvatarUpload } from "@/components/ui/avatar-upload";
 
 export function BusinessProfileTab() {
   const { settings, isLoading, updateSettings } = useBusinessSettings();
+  const { company, isLoading: companyLoading } = useCompany();
   
   const [formData, setFormData] = useState<BusinessSettingsInput>({
     business_name: "",
@@ -18,18 +20,23 @@ export function BusinessProfileTab() {
   useEffect(() => {
     if (settings) {
       setFormData({
-        business_name: settings.business_name || "",
+        business_name: settings.business_name || company?.name || "",
         logo_url: settings.logo_url,
       });
+    } else if (company) {
+      setFormData({
+        business_name: company.name || "",
+        logo_url: null,
+      });
     }
-  }, [settings]);
+  }, [settings, company]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettings.mutate(formData);
   };
 
-  if (isLoading) {
+  if (isLoading || companyLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
