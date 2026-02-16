@@ -399,30 +399,80 @@ async function handleCheck(supabase: any, body: any, corsHeaders: any) {
     console.error('Error fetching unit:', unitError);
   }
 
-  // Buscar horário de expediente configurado
+  // Determinar o dia da semana da data solicitada (0=Domingo, 6=Sábado)
+  const dateOnly = date.split('T')[0];
+  const [reqYear, reqMonth, reqDay] = dateOnly.split('-').map(Number);
+  const requestedDate = new Date(reqYear, reqMonth - 1, reqDay);
+  const dayOfWeek = requestedDate.getDay();
+  console.log(`Requested date ${dateOnly} is day_of_week: ${dayOfWeek}`);
+
+  // Buscar horário de expediente da tabela business_hours (por dia da semana)
   let openingHour = 8;  // default
+  let openingMinute = 0;
   let closingHour = 21; // default
+  let closingMinute = 0;
+  let isDayOpen = true;
 
   if (unitData?.user_id) {
-    const { data: settings, error: settingsError } = await supabase
-      .from('business_settings')
-      .select('opening_time, closing_time')
+    const { data: dayHours, error: hoursError } = await supabase
+      .from('business_hours')
+      .select('is_open, opening_time, closing_time')
       .eq('user_id', unitData.user_id)
+      .eq('day_of_week', dayOfWeek)
       .maybeSingle();
 
-    if (settingsError) {
-      console.error('Error fetching business settings:', settingsError);
+    if (hoursError) {
+      console.error('Error fetching business hours:', hoursError);
     }
 
-    if (settings) {
-      if (settings.opening_time) {
-        openingHour = parseInt(settings.opening_time.split(':')[0]);
+    if (dayHours) {
+      isDayOpen = dayHours.is_open !== false;
+      if (dayHours.opening_time) {
+        const [oh, om] = dayHours.opening_time.split(':').map(Number);
+        openingHour = oh;
+        openingMinute = om || 0;
       }
-      if (settings.closing_time) {
-        closingHour = parseInt(settings.closing_time.split(':')[0]);
+      if (dayHours.closing_time) {
+        const [ch, cm] = dayHours.closing_time.split(':').map(Number);
+        closingHour = ch;
+        closingMinute = cm || 0;
       }
-      console.log(`Using configured hours: ${openingHour}:00 - ${closingHour}:00`);
+      console.log(`Using business_hours for day ${dayOfWeek}: open=${isDayOpen}, ${openingHour}:${String(openingMinute).padStart(2,'0')} - ${closingHour}:${String(closingMinute).padStart(2,'0')}`);
+    } else {
+      // Fallback: tentar business_settings
+      const { data: settings } = await supabase
+        .from('business_settings')
+        .select('opening_time, closing_time')
+        .eq('user_id', unitData.user_id)
+        .maybeSingle();
+
+      if (settings) {
+        if (settings.opening_time) {
+          const [oh, om] = settings.opening_time.split(':').map(Number);
+          openingHour = oh;
+          openingMinute = om || 0;
+        }
+        if (settings.closing_time) {
+          const [ch, cm] = settings.closing_time.split(':').map(Number);
+          closingHour = ch;
+          closingMinute = cm || 0;
+        }
+      }
+      console.log(`Using fallback business_settings: ${openingHour}:${String(openingMinute).padStart(2,'0')} - ${closingHour}:${String(closingMinute).padStart(2,'0')}`);
     }
+  }
+
+  // Se o dia está fechado, retornar sem slots
+  if (!isDayOpen) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        date,
+        available_slots: [],
+        message: 'Estabelecimento fechado neste dia'
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   // Calcular hora atual no timezone da unidade
@@ -441,7 +491,7 @@ async function handleCheck(supabase: any, body: any, corsHeaders: any) {
   const currentHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
   const currentMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
 
-  const dateOnly = date.split('T')[0];
+  // dateOnly already defined above
   const isToday = dateOnly === todayDate;
 
   console.log(`Today in timezone ${timezone}: ${todayDate}, current time: ${currentHour}:${currentMinute}, requested date: ${dateOnly}, isToday: ${isToday}`);
@@ -509,44 +559,46 @@ async function handleCheck(supabase: any, body: any, corsHeaders: any) {
 
   console.log(`Found ${appointments?.length || 0} existing appointments`);
 
-  // Gerar slots disponíveis (usando horário de expediente configurado)
+  // Gerar slots disponíveis (usando horário de expediente configurado por dia)
   const availableSlots: any[] = [];
+  const closingTotalMinutes = closingHour * 60 + closingMinute;
+  const openingTotalMinutes = openingHour * 60 + openingMinute;
 
-  for (let hour = openingHour; hour < closingHour; hour++) {
-    for (let minute = 0; minute < 60; minute += 30) {
-      // Filtrar horários passados se for hoje
-      if (isToday) {
-        if (hour < currentHour || (hour === currentHour && minute <= currentMinute)) {
-          continue; // Pula este slot pois já passou
-        }
+  console.log(`Generating slots from ${openingHour}:${String(openingMinute).padStart(2,'0')} to ${closingHour}:${String(closingMinute).padStart(2,'0')} (${openingTotalMinutes}-${closingTotalMinutes} minutes)`);
+
+  for (let totalMin = openingTotalMinutes; totalMin < closingTotalMinutes; totalMin += 30) {
+    const hour = Math.floor(totalMin / 60);
+    const minute = totalMin % 60;
+
+    // Filtrar horários passados se for hoje
+    if (isToday) {
+      if (hour < currentHour || (hour === currentHour && minute <= currentMinute)) {
+        continue;
       }
+    }
 
-      const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-      const slotLocalStr = `${dateOnly}T${timeStr}:00`;
-      const slotStart = convertLocalToUTC(slotLocalStr, timezone);
+    const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    const slotLocalStr = `${dateOnly}T${timeStr}:00`;
+    const slotStart = convertLocalToUTC(slotLocalStr, timezone);
 
-      for (const barber of barbers) {
-        // Verificar se está no intervalo do barbeiro
-        const isLunchBreak = isWithinLunchBreak(barber, hour, minute);
-        
-        // Verificar se o barbeiro está ocupado neste horário
-        const isOccupied = appointments?.some((apt: any) => {
-          if (apt.barber_id !== barber.id) return false;
-          const aptStart = new Date(apt.start_time);
-          const aptEnd = new Date(apt.end_time);
-          return slotStart >= aptStart && slotStart < aptEnd;
+    for (const barber of barbers) {
+      const isLunchBreak = isWithinLunchBreak(barber, hour, minute);
+      
+      const isOccupied = appointments?.some((apt: any) => {
+        if (apt.barber_id !== barber.id) return false;
+        const aptStart = new Date(apt.start_time);
+        const aptEnd = new Date(apt.end_time);
+        return slotStart >= aptStart && slotStart < aptEnd;
+      });
+
+      if (!isOccupied && !isLunchBreak) {
+        availableSlots.push({
+          time: timeStr,
+          datetime: slotStart.toISOString(),
+          barber_id: barber.id,
+          barber_name: barber.name,
+          status: "vago"
         });
-
-        // Só adiciona slot se não estiver ocupado E não for intervalo
-        if (!isOccupied && !isLunchBreak) {
-          availableSlots.push({
-            time: timeStr,
-            datetime: slotStart.toISOString(),
-            barber_id: barber.id,
-            barber_name: barber.name,
-            status: "vago"
-          });
-        }
       }
     }
   }
