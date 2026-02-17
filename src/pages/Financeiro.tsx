@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CashFlowTab } from "@/components/financeiro/CashFlowTab";
@@ -5,9 +6,45 @@ import { CommissionReportTab } from "@/components/financeiro/CommissionReportTab
 import { ExpensesTab } from "@/components/financeiro/ExpensesTab";
 import { InventoryTab } from "@/components/financeiro/InventoryTab";
 import { CourtesyReportTab } from "@/components/financeiro/CourtesyReportTab";
-import { DollarSign, FileText, TrendingDown, Package, Gift } from "lucide-react";
+import { DeletionPasswordDialog } from "@/components/shared/DeletionPasswordDialog";
+import { useBusinessSettings } from "@/hooks/useBusinessSettings";
+import { useBarberAuth } from "@/hooks/useBarberAuth";
+import { DollarSign, FileText, TrendingDown, Package, Gift, Lock } from "lucide-react";
+
+// Tabs that require password (all except commission)
+const PROTECTED_TABS = ["cash-flow", "expenses", "inventory", "courtesy"];
 
 export default function Financeiro() {
+  const { settings, verifyDeletionPassword } = useBusinessSettings();
+  const { isBarber } = useBarberAuth();
+  const isDeletionPasswordActive = !!settings?.deletion_password_enabled && !!settings?.deletion_password_hash;
+
+  // If barber (partner), default to commission tab; otherwise cash-flow
+  const defaultTab = isBarber ? "commission" : "cash-flow";
+
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [unlockedTabs, setUnlockedTabs] = useState<Set<string>>(new Set());
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+
+  // If password not active or user is not owner, unlock everything
+  const needsPassword = isDeletionPasswordActive && !isBarber;
+
+  const handleTabChange = (tab: string) => {
+    if (needsPassword && PROTECTED_TABS.includes(tab) && !unlockedTabs.has(tab)) {
+      setPendingTab(tab);
+      setPasswordDialogOpen(true);
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
+  // For barbers, if they try to access protected tabs without password, block
+  // Actually barbers only see commission, but if owner has password active, protect the rest
+  const isTabLocked = (tab: string) => {
+    return needsPassword && PROTECTED_TABS.includes(tab) && !unlockedTabs.has(tab);
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -16,18 +53,18 @@ export default function Financeiro() {
           <p className="mt-1 text-muted-foreground">Controle de caixa, despesas, estoque e comissões</p>
         </div>
 
-        <Tabs defaultValue="cash-flow" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="bg-muted">
             <TabsTrigger value="cash-flow" className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
+              {isTabLocked("cash-flow") ? <Lock className="h-4 w-4" /> : <DollarSign className="h-4 w-4" />}
               Fluxo de Caixa
             </TabsTrigger>
             <TabsTrigger value="expenses" className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4" />
+              {isTabLocked("expenses") ? <Lock className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
               Despesas
             </TabsTrigger>
             <TabsTrigger value="inventory" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
+              {isTabLocked("inventory") ? <Lock className="h-4 w-4" /> : <Package className="h-4 w-4" />}
               Estoque
             </TabsTrigger>
             <TabsTrigger value="commission" className="flex items-center gap-2">
@@ -35,7 +72,7 @@ export default function Financeiro() {
               Comissões
             </TabsTrigger>
             <TabsTrigger value="courtesy" className="flex items-center gap-2">
-              <Gift className="h-4 w-4" />
+              {isTabLocked("courtesy") ? <Lock className="h-4 w-4" /> : <Gift className="h-4 w-4" />}
               Cortesias
             </TabsTrigger>
           </TabsList>
@@ -61,6 +98,25 @@ export default function Financeiro() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <DeletionPasswordDialog
+        open={passwordDialogOpen}
+        onOpenChange={(open) => {
+          setPasswordDialogOpen(open);
+          if (!open) setPendingTab(null);
+        }}
+        onVerify={async (password) => {
+          const valid = await verifyDeletionPassword(password);
+          if (valid && pendingTab) {
+            setUnlockedTabs((prev) => new Set([...prev, pendingTab]));
+            setActiveTab(pendingTab);
+            setPendingTab(null);
+          }
+          return valid;
+        }}
+        title="Senha de Segurança"
+        description="Digite a senha de segurança para acessar esta seção do financeiro."
+      />
     </DashboardLayout>
   );
 }
