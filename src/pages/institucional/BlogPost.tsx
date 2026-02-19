@@ -82,9 +82,11 @@ const BlogPost = () => {
     readTime: rp.read_time || '5 min',
   }));
 
-  const shareUrl = `https://lgrugpsyewvinlkgmeve.supabase.co/functions/v1/blog-share?slug=${post.slug}`;
-  const encodedShareUrl = encodeURIComponent(shareUrl);
+  const siteUrl = `https://barbersoft.com.br/blog/${post.slug}`;
+  const edgeFunctionUrl = `https://lgrugpsyewvinlkgmeve.supabase.co/functions/v1/blog-share?slug=${post.slug}`;
   const shareText = encodeURIComponent(post.title);
+  const encodedSiteUrl = encodeURIComponent(siteUrl);
+  const encodedEdgeFunctionUrl = encodeURIComponent(edgeFunctionUrl);
 
   const schema = {
     '@context': 'https://schema.org',
@@ -150,7 +152,7 @@ const BlogPost = () => {
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" asChild>
-                <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodedShareUrl}`} target="_blank" rel="noopener noreferrer">
+                <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodedEdgeFunctionUrl}`} target="_blank" rel="noopener noreferrer">
                   <Facebook className="h-4 w-4 mr-2" />Facebook
                 </a>
               </Button>
@@ -167,7 +169,7 @@ const BlogPost = () => {
                 </a>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <a href={`https://api.whatsapp.com/send?text=${shareText}%20${encodedShareUrl}`} target="_blank" rel="noopener noreferrer">
+                <a href={`https://api.whatsapp.com/send?text=${shareText}%20${encodedSiteUrl}`} target="_blank" rel="noopener noreferrer">
                   <MessageCircle className="h-4 w-4 mr-2" />WhatsApp
                 </a>
               </Button>
